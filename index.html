@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FOX — Logo Direction Switcher</title>
+<style>
+  :root {
+    --page-bg: #e6dfd5;
+    --dark: #1e232c;
+    --accent: #ff4d14;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    background: var(--page-bg);
+  }
+  #tabbar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 auto;
+    background: #ffffff;
+    padding: 14px 16px 16px;
+    box-shadow: 0 1px 0 rgba(30,35,44,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  #tabbar .title {
+    color: var(--dark);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin-bottom: 12px;
+    white-space: nowrap;
+  }
+  .tabs {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+  }
+  .tab-btn {
+    appearance: none;
+    background: var(--page-bg);
+    color: var(--dark);
+    border: 1.5px solid var(--dark);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 10px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .tab-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--dark);
+  }
+  .tab-btn.active:hover {
+    color: var(--dark);
+  }
+  .tab-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  #frames {
+    position: relative;
+    width: 100%;
+    flex: 1 1 auto;
+  }
+  iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: var(--page-bg);
+    display: none;
+  }
+  iframe.active {
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<div id="tabbar">
+  <div class="title">Fox Logo Design Options</div>
+  <div class="tabs" role="tablist" aria-label="Logo direction preview">
+    <button class="tab-btn active" data-target="d1" role="tab" aria-selected="true">Direction 1</button>
+    <button class="tab-btn" data-target="d2" role="tab" aria-selected="false">Direction 2</button>
+    <button class="tab-btn" data-target="d4" role="tab" aria-selected="false">Direction 4</button>
+    <button class="tab-btn" data-target="d6" role="tab" aria-selected="false">Direction 6</button>
+  </div>
+</div>
+
+<div id="frames">
+  <iframe id="frame-d1" src="d1/index.html" title="Direction 1"></iframe>
+  <iframe id="frame-d2" title="Direction 2"></iframe>
+  <iframe id="frame-d4" title="Direction 4"></iframe>
+  <iframe id="frame-d6" title="Direction 6"></iframe>
+</div>
+
+<script>
+  const srcMap = { d1: "d1/index.html", d2: "d2/index.html", d4: "d4/index.html", d6: "d6/index.html" };
+  const buttons = document.querySelectorAll(".tab-btn");
+  const loaded = new Set(["d1"]);
+  let activeTarget = "d1";
+
+  document.getElementById("frame-d1").classList.add("active");
+
+  function getScrollFraction(frame) {
+    try {
+      const doc = frame.contentWindow.document.scrollingElement || frame.contentWindow.document.documentElement;
+      const max = doc.scrollHeight - frame.contentWindow.innerHeight;
+      return max > 0 ? frame.contentWindow.scrollY / max : 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function applyScrollFraction(frame, fraction) {
+    try {
+      const doc = frame.contentWindow.document.scrollingElement || frame.contentWindow.document.documentElement;
+      const max = doc.scrollHeight - frame.contentWindow.innerHeight;
+      frame.contentWindow.scrollTo(0, Math.round(max * fraction));
+    } catch (e) {
+      // cross-origin or not-yet-ready; ignore
+    }
+  }
+
+  // The iframe's `load` event can fire before React has finished mounting
+  // and images have settled the page's true height, so re-apply the target
+  // scroll a few times as the layout grows.
+  function settleScrollFraction(frame, fraction, attemptsLeft) {
+    applyScrollFraction(frame, fraction);
+    if (attemptsLeft > 0) {
+      setTimeout(() => settleScrollFraction(frame, fraction, attemptsLeft - 1), 100);
+    }
+  }
+
+  function showTab(target) {
+    if (target === activeTarget) return;
+
+    const currentFrame = document.getElementById("frame-" + activeTarget);
+    const scrollFraction = getScrollFraction(currentFrame);
+
+    buttons.forEach((btn) => {
+      const isActive = btn.dataset.target === target;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-selected", String(isActive));
+    });
+
+    document.querySelectorAll("iframe").forEach((frame) => {
+      frame.classList.toggle("active", frame.id === "frame-" + target);
+    });
+
+    const targetFrame = document.getElementById("frame-" + target);
+
+    if (!loaded.has(target)) {
+      loaded.add(target);
+      targetFrame.addEventListener(
+        "load",
+        () => settleScrollFraction(targetFrame, scrollFraction, 8),
+        { once: true }
+      );
+      targetFrame.src = srcMap[target];
+    } else {
+      settleScrollFraction(targetFrame, scrollFraction, 3);
+    }
+
+    activeTarget = target;
+  }
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => showTab(btn.dataset.target));
+  });
+</script>
+
+</body>
+</html>
